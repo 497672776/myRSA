@@ -1,0 +1,89 @@
+#!/bin/bash
+# 仿真脚本
+if [ "$1" == "-h" ]  #帮助
+then
+    echo "  Usage: run [para] <string>"
+    echo "  run -h          显示帮助"
+    echo "  run             仿真上次仿真的目录，也是仿真数据"
+    echo "  run -d dir      仿真dir目录"
+    echo "  run -f file     运行单.v文件分析"
+    echo "  run -r          刷新仿真数据, 不再重新开启新的gtkwave"
+    exit 0
+fi
+
+#==============================================================================
+if [ "$1" == "-clean" ]  #当仿真参数是 -clear时删除build文件夹下所有文件, 包括仿真数据
+then
+    rm -rf ./build/*  #清空build文件夹下的内容
+    echo "note:clean success!"
+    exit 0
+fi
+
+if [ "$1" == "-f" ]  #运行单文件
+then 
+    if [ -f $2 ];then
+        clear
+        echo -e "\033[36m运行单文件verilog, 如用于处理文件的文件, 当前运行的是：$2\033[0m"
+        iverilog $2
+        vvp a.out -lxt2
+        rm -f a.out
+        gtkwave wave.lxt2 &> /dev/null
+    else
+        echo "ERROR:文件$2不存在!"
+    fi
+    exit 0
+fi
+
+if [ "$1" == "-d" ]  #指定要仿真的文件夹开始仿真
+then
+    DST_DIR=$2
+    if [ ! -d $DST_DIR ];then
+        echo "ERROR:仿真目录不对, 执行参数应为 run -d 需要仿真的目录"
+        exit 1
+    fi
+    stat=$(echo $(ls $DST_DIR | grep '.v'))
+    if [ "$stat" = "" ];then
+        echo "ERROR:文件路径第一层目录下没有任何可用于仿真的文件！"
+        exit 1
+    fi
+    echo "$DST_DIR" > lastDir.txt #保存上次仿真路径
+
+
+
+fi
+#==============================================================================
+# -d 和 -r 都会运行的代码
+DIR=$(cat lastDir.txt)
+if [ ! -d $DIR ];then
+     echo "ERROR:仿真的目录不存在,执行参数应为 (run -d 需要仿真的目录） 以更新仿真数据记录"
+     exit 1
+fi
+
+echo -e "\033[36mINFO: 当前仿真的目录为 $DIR \033[0m"
+
+rm -rf ./build/*  #清空build文件夹下的内容
+# 拷贝文件项目文件(.v)到仿真目录build
+src=$(find $DIR -name "*.v")
+cp $src ./build/
+
+# 进入仿真文件所在的文件夹
+cd build
+PARA=$(ls *.v)
+iverilog  -o wave $PARA #综合verilog代码
+vvp -n wave -lxt2  #仿真
+rm wave
+
+# 下面根据运行脚本时传入的参数进行选择运行
+if [ "$1" == "-r" ]  #当仿真参数是 -r时只更新数据, 不在新开启gtkwave
+then
+    echo ""
+    echo "note:rebuild success!"
+    echo -e "\033[36mplease reload wave in gtkwave!\033[0m"
+    echo ""
+    exit 0
+fi
+
+#==============================================================================
+# -d 和 无参的时候运行 只有-r不重新打开新的gtkwave
+gtkwave wave.lxt2 &> /dev/null & #显示波形
+exit 0

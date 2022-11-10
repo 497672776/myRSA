@@ -1,22 +1,27 @@
 `timescale 1ns / 1ps
+
+
 module mont_mult_modif(
-        x, y,
-        clk, reset, start,
+        x,
+        y,
+        clk,
+        reset,
+        start,
         z,
         done1
     );
-    parameter m =192'hfffffffffffffffffffffffffffffffeffffffffffffffff,
+    parameter m = 192'hfffffffffffffffffffffffffffffffeffffffffffffffff,
               k = 192, logk = 8, zero = { logk {1'b0}},
               minus_m = {1'b0,192'h000000000000000000000000000000010000000000000001},
-              delay = 8'b01100000, COUNT = 8'b10111111; //(k-1,logk)
+              delay = 8'b01100000, COUNT = 8'b10111111; // (k-1,logk)
 
     parameter S0 = 3'd0, S1 = 3'd1, S2 = 3'd2, S3 = 3'd3, S4 = 3'd4;
+
     input [k-1:0] x;
     input [k-1:0] y;
     input clk, reset, start;
     output [k-1:0] z;
     output done1;
-
     reg [logk-1:0] count;
     reg [logk-1:0] timer_state;
     reg [k:0] pc, psa;
@@ -40,10 +45,12 @@ module mont_mult_modif(
     // Note: (k) y
     // Note: (k+1) y_by_xi
     genvar i;
+
     generate
-        for(i=0;i<k;i=i+1) begin:and_gates
+        for(i = 0;i<k;i = i+1) begin:and_gates
             and a(y_by_xi[i],y[i],xi);
         end
+
     endgenerate
     assign y_by_xi[k] = 1'b0;
 
@@ -52,7 +59,8 @@ module mont_mult_modif(
     // output: ac, as
     // Note: (k+1) pc, psa, y_by_xi
     // Note: (k+2) ac, as
-generate for(i=0;i<=k;i=i+1) begin:first_csa
+    generate
+        for(i = 0;i <= k;i = i+1) begin:first_csa
             xor x(as[i],pc[i],psa[i],y_by_xi[i]);
             wire w1,w2,w3;
             and a1(w1,pc[i],psa[i]);
@@ -60,6 +68,7 @@ generate for(i=0;i<=k;i=i+1) begin:first_csa
             and a3(w3,psa[i],y_by_xi[i]);
             or o(ac[i+1],w1,w2,w3);
         end
+
     endgenerate
     assign ac[0] = 1'b0, as[k+1] = 1'b0;
 
@@ -69,7 +78,8 @@ generate for(i=0;i<=k;i=i+1) begin:first_csa
     // Note: (k+2) ac, as, long_m
     // Note: (k+2) bs, bc
     assign long_m = {{2'b00},m};
-generate for(i=0;i<=k;i=i+1) begin:second_csa
+    generate
+        for(i = 0;i <= k;i = i+1) begin:second_csa
             xor x(bs[i],ac[i],as[i],long_m[i]);
             wire w1,w2,w3;
             and a1(w1,ac[i],as[i]);
@@ -77,6 +87,7 @@ generate for(i=0;i<=k;i=i+1) begin:second_csa
             and a3(w3,as[i],long_m[i]);
             or o(bc[i+1],w1,w2,w3);
         end
+
     endgenerate
     assign bc[0] = 1'b0, bs[k+1] = ac[k+1];
 
@@ -84,20 +95,20 @@ generate for(i=0;i<=k;i=i+1) begin:second_csa
     // input: (k+2) as, ac, bs, bc
     // output: (k+1) next_pc, net_psa
     assign half_as = as[k+1:1], half_ac = ac[k+1:1],
-           half_bs = bs[k+1:1], half_bc = bc[k+1:1];
-    assign next_pc = (as[0]==1'b0)? half_ac:half_bc;
-    assign next_psa = (as[0]==1'b0)? half_as:half_bs;
+           half_bs         = bs[k+1:1], half_bc         = bc[k+1:1];
+    assign next_pc  = (as[0] == 1'b0)? half_ac:half_bc;
+    assign next_psa = (as[0] == 1'b0)? half_as:half_bs;
 
     // Func: load 清零， ce_p 赋值
     // input: (k+1) next_pc, net_psa
     // output: (k+1) pc, psa
-    always@(posedge(clk)) begin:parallel_register
-        if (load==1'b1)begin
-            pc = { k+1 {1'b0} };
+    always@(posedge clk) begin:parallel_register
+        if (load == 1'b1)begin
+            pc  = { k+1 {1'b0} };
             psa = { k+1 {1'b0} };
         end
-        else if (ce_p==1'b1)begin
-            pc = next_pc;
+        else if (ce_p == 1'b1)begin
+            pc  = next_pc;
             psa = next_psa;
         end
     end
@@ -112,16 +123,18 @@ generate for(i=0;i<=k;i=i+1) begin:second_csa
     assign p_minus_m = p + minus_m;
 
     // Func： choose a value to z
-    assign z = (p_minus_m[k]==1'b0)? p[k-1:0]:p_minus_m[k-1:0];
+    assign z = (p_minus_m[k] == 1'b0)? p[k-1:0]:p_minus_m[k-1:0];
 
     // Func: right shift with load and ce_p
     always@(posedge(clk)) begin:shift_register
         integer i;
-        if (load==1'b1)
+        if (load == 1'b1)begin
             int_x = x;
-        else if (ce_p==1'b1)begin
-            for(i=0;i<=k-2;i=i+1)
-                int_x[i] = int_x[i+1];
+        end
+        else if (ce_p == 1'b1)begin
+            for(i = 0;i <= k-2;i = i+1)begin
+                int_x[i]   = int_x[i+1];
+            end
             int_x[k-1] = 1'b0;
         end
     end
@@ -130,106 +143,126 @@ generate for(i=0;i<=k;i=i+1) begin:second_csa
     assign xi = int_x[0];
 
     // Func:
-    assign equal_zero = (count==zero)? 1'b1:1'b0;
+    assign equal_zero = (count == zero)? 1'b1:1'b0;
 
     // Func: counter, if load then count = 191
     always@(posedge(clk)) begin:counter
-        if (load==1'b1)
+        if (load == 1'b1)begin
             count <= COUNT;
-        else if (ce_p==1'b1)
+        end
+        else if (ce_p == 1'b1)begin
             count <= count - 1'b1;
+        end
     end
 
     // Func: if clk change or current state change, update some variable
     always@(clk, current_state)begin
         case(current_state)
             S0:begin
-                ce_p = 1'b0;
-                load = 1'b0;
+                ce_p       = 1'b0;
+                load       = 1'b0;
                 load_timer = 1'b1;
-                done = 1'b1;
+                done       = 1'b1;
             end
+
             S1:begin
-                ce_p = 1'b0;
-                load = 1'b0;
+                ce_p       = 1'b0;
+                load       = 1'b0;
                 load_timer = 1'b1;
-                done = 1'b1;
+                done       = 1'b1;
             end
+
             S2:begin
-                ce_p = 1'b0;
-                load = 1'b1;
+                ce_p       = 1'b0;
+                load       = 1'b1;
                 load_timer = 1'b1;
-                done = 1'b0;
+                done       = 1'b0;
             end
+
             S3:begin
-                ce_p = 1'b1;
-                load = 1'b0;
+                ce_p       = 1'b1;
+                load       = 1'b0;
                 load_timer = 1'b1;
-                done = 1'b0;
+                done       = 1'b0;
             end
+
             S4:begin
-                ce_p = 1'b0;
-                load = 1'b0;
+                ce_p       = 1'b0;
+                load       = 1'b0;
                 load_timer = 1'b0;
-                done = 1'b0;
+                done       = 1'b0;
             end
+
             default:begin
-                ce_p = 1'b0;
-                load = 1'b0;
+                ce_p       = 1'b0;
+                load       = 1'b0;
                 load_timer = 1'b1;
-                done = 1'b1;
+                done       = 1'b1;
             end
+
         endcase
     end
 
     // Func: if reset, current_state = s0, current_state = next_state;
     always@(posedge clk)begin
-        if(reset)
+        if (reset)begin
             current_state = S0;
-        else
+        end
+        else begin
             current_state = next_state;
+        end
     end
 
     // Func: update next_state
     always@(*)begin
         next_state = current_state;
-        if (reset==1'b1)
+        if (reset == 1'b1)begin
             next_state = S0;
-        else if (clk==1'b1)begin
+        end
+        else if (clk == 1'b1)begin
             case(next_state)
                 S0:
-                    if(start==1'b0)
+                    if(start == 1'b0)begin
                         next_state = S1;
+                    end
+
                 S1:
-                    if(start==1'b1)
+
+                    if(start == 1'b1)begin
                         next_state = S2;
+                    end
+
                 S2:
                     next_state = S3;
                 S3:
-                    if(equal_zero==1'b1)
+
+                    if (equal_zero == 1'b1)begin
                         next_state = S4;
+                    end
+
                 S4:
-                    if(time_out==1'b1)
+
+                    if (time_out == 1'b1)begin
                         next_state = S0;
+                    end
+
                 default:
                     next_state = S0;
+
             endcase
         end
     end
 
     // Func: timer_state = 96
     always@(posedge clk) begin:timer
-        if (clk==1'b1)begin
-            if (load_timer==1'b1)
+        if (clk == 1'b1)begin
+            if (load_timer == 1'b1)begin
                 timer_state = delay;
-            else
+            end
+            else begin
                 timer_state = timer_state - 1'b1;
+            end
         end
     end
-
-    assign time_out = (timer_state==zero)? 1'b1:1'b0;
-
+    assign time_out = (timer_state == zero)? 1'b1:1'b0;
 endmodule
-
-
-

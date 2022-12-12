@@ -34,22 +34,16 @@ module tb;
 
     initial begin
         rst_n = 1;
-        #(NCLK / 2) rst_n = 0;
-        #(NCLK / 2) rst_n = 1;
+        #(NCLK) rst_n = 0;
+        #(NCLK) rst_n = 1;
 
+        #(NCLK);
         start = 0;
-        x = 8'd11;
+        x = 8'd2;
         y = 8'd11;
         #(NCLK);
         start = 1;
-        #(NCLK * 50000);
-
-        start = 0;
-        x = 8'd02;
-        y = 8'd02;
-        #(NCLK);
-        start = 1;
-        #(NCLK * 50000);
+        wait(done);
 
         repeat (1000) @(posedge clk) begin
         end

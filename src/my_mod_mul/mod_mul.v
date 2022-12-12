@@ -17,8 +17,6 @@ module mod_mul (
 
     parameter IDLE = 3'd0, LOAD = 3'd1, UPDATE = 3'd2, ENDING = 3'd3;
 
-    wire [k:0] p_minus_m;
-
     reg load, update, done;
     reg [2:0] current_state, next_state;
 
@@ -59,10 +57,10 @@ module mod_mul (
     // Func: if (a mod 2) = 0 then p = a/2; else p = b/2;
     wire [k:0] half_a, half_b;
     assign half_a = a[k+1:1], half_b = b[k+1:1];
+    wire [k:0] next_p;
     assign next_p = (a[0] == 1'b0) ? half_a : half_b;
 
     // Func: load: p赋初值0， update: 更新p
-    wire [k:0] next_p;
     always @(posedge clk) begin : parallel_register
         if (load) begin
             p = 'b0;

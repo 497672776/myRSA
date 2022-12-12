@@ -7,11 +7,11 @@ module tb;
     wire done;
 
     //生成始时钟
-    parameter NCLK = 10;
+    parameter CLK_PERIOD = 10;
     initial begin
         clk = 0;
         forever
-            clk = #(NCLK / 2) ~clk;
+            clk = #(CLK_PERIOD / 2) ~clk;
     end
 
     /****************** 开始 ADD module inst ******************/
@@ -35,22 +35,24 @@ module tb;
 
     initial begin
         rst_n = 1;
-        #(NCLK / 2) rst_n = 0;
-        #(NCLK / 2) rst_n = 1;
+        #(CLK_PERIOD) rst_n = 0;
+        #(CLK_PERIOD) rst_n = 1;
 
+        #(CLK_PERIOD);
         start = 0;
         x = 8'Hf7;
         y = 8'H0a;
-        #(NCLK);
+        #(CLK_PERIOD);
         start = 1;
-        #(NCLK * 3000);
-
+        wait(done);
+        
+        #(CLK_PERIOD);
         start = 0;
         x = 8'Hf7;
         y = 8'H0a;
-        #(NCLK);
+        #(CLK_PERIOD);
         start = 1;
-        #(NCLK * 3000);
+        wait(done);
 
         repeat (1000) @(posedge clk) begin
         end
@@ -62,4 +64,3 @@ module tb;
 endmodule
 
 // z = 0x00000000000009A5FFFFFFFFFFFFF65A0000000000000000
-

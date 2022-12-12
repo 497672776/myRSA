@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 
+// Func: z = Montgomery(x,y) = x*y*R' mod m
 module mod_mul (
         input [k-1:0] x,
         input [k-1:0] y,
@@ -11,84 +12,74 @@ module mod_mul (
     );
 
     parameter m = 192'hfffffffffffffffffffffffffffffffeffffffffffffffff;
-    parameter k = 192, logk = 8, zero = {logk{1'b0}};
-    parameter minus_m = {1'b0, 192'h000000000000000000000000000000010000000000000001};
-    parameter COUNT = 8'd191;
+    localparam minus_m = {1'b0, ~m+1'b1};
+    parameter k = 192, logk = 8;
 
-    parameter IDLE = 3'd0, LOAD = 3'd1, CE_P = 3'd2, ENDING = 3'd3;
+    parameter IDLE = 3'd0, LOAD = 3'd1, UPDATE = 3'd2, ENDING = 3'd3;
 
-
-    reg [k-1:0] reg_x;
-    wire xi;
-    wire [k:0] y_by_xi;
-    reg [k:0] p;  // p < 2m, 所以比m多一个位，k+1
-    wire [k+1:0] a;  // a比p多一位
-    wire [k+1:0] b;  // b比p多一位
-    wire [k:0] next_p;
     wire [k:0] p_minus_m;
-    wire [k+1:0] long_m;
-    wire [k:0] half_a, half_b;
 
+    reg load, update, done;
+    reg [2:0] current_state, next_state;
+
+    // Func: counter
     reg [logk-1:0] count;
-    wire equal_zero;
-    reg load, ce_p;
-    reg [2:0] current_state;
-    reg [2:0] next_state;
-    reg start_reg, start_pedge;
-    reg done;
-
-    // Func: xi 右移
-    always @(posedge clk) begin : shift_register
-        if (load == 1'b1) begin
-            reg_x = x;
+    always @(posedge clk) begin : counter
+        if (load) begin
+            count <= 0;
         end
-        else if (ce_p == 1'b1) begin
-            reg_x = {1'b0, reg_x[k-1:1]};
+        else if (update) begin
+            count <= count + 1'b1;
         end
     end
-    assign xi = reg_x[0];
 
-    // Func: y_by_xi = xi * y
-    // 无符号数乘法时，结果变量位宽应该为2个操作数位宽之和。
-    assign y_by_xi = xi * y;
+    // load: 加载x
+    reg [k-1:0] reg_x;
+    always @(posedge clk) begin : shift_register
+        if (load) begin
+            reg_x = x;
+        end
+    end
+    wire xi;
+    assign xi = reg_x[count];
 
-    // Func: a = p + y_by_xi
-    assign a = p + y_by_xi;
+    // 0 <=  p < 2m, 所以比m多一个位，k+1
+    reg [k:0] p;
+    // Func: a = p + y*xi
+    // xi = 1 时， y*xi = y; xi = 0 时， y*xi = 0
+    // p 是(k+1)位， y是k位， 所以 a最多是(k+2)位
+    wire [k+1:0] a;
+    assign a = xi? (p + y) : p;
 
+    // 由于 p是由a/2或b/2得来的，而p最多是k+1位，所以b最多是k+2位
     // Func: b = a + m
-    assign long_m = {{2'b00}, m};
-    assign b = a + long_m;
+    wire [k+1:0] b;
+    assign b = a + m;
 
     // Func: if (a mod 2) = 0 then p = a/2; else p = b/2;
+    wire [k:0] half_a, half_b;
     assign half_a = a[k+1:1], half_b = b[k+1:1];
     assign next_p = (a[0] == 1'b0) ? half_a : half_b;
 
-    // Func: load 清零， ce_p 赋值
+    // Func: load: p赋初值0， update: 更新p
+    wire [k:0] next_p;
     always @(posedge clk) begin : parallel_register
-        if (load == 1'b1) begin
-            p = {(k + 1) {1'b0}};
+        if (load) begin
+            p = 'b0;
         end
-        else if (ce_p == 1'b1) begin
+        else if (update) begin
             p = next_p;
         end
     end
 
-    assign p_minus_m = p + minus_m;
-
     // Note: p_minus_m = p + 2^k - m = 2^k + (p-m)
-    // Note: p < 2m, p-m < m < 2^k, 因为p-m < 2^k，p_minus_m < 2^(k+1),不会溢出
-    assign z = (p_minus_m[k] == 1'b0) ? p[k-1:0] : p_minus_m[k-1:0];
-
-    // Func: counter, if load then count = 191
-    always @(posedge clk) begin : counter
-        if (load == 1'b1) begin
-            count <= COUNT;
-        end
-        else if (ce_p == 1'b1) begin
-            count <= count - 1'b1;
-        end
-    end
-    assign equal_zero = (count == zero) ? 1'b1 : 1'b0;
+    // Note: p-m < 0时, p_minus_m[k] = 0 ,我们要输出p
+    // Note: m > p-m > 0时, p_minus_m[k] = 1 ,我们要输出p-m
+    // Note: z < m, 所以只取前k位
+    // Func: if p >= m, z = p-m; else z = p
+    wire [k:0] p_minus_m;
+    assign p_minus_m = next_p + minus_m;
+    assign z = (p_minus_m[k] == 1'b0) ? next_p[k-1:0] : p_minus_m[k-1:0];
 
     // FSM-1
     always @(posedge clk, negedge rst_n) begin : proc_current_state
@@ -100,27 +91,17 @@ module mod_mul (
         end
     end
 
-    // 检测start上升沿
-    always @(posedge clk) begin
-        start_reg   <= start;
-        start_pedge <= start & ~start_reg;
-    end
-
     // FSM-2
     always @(*) begin
         case (current_state)
             IDLE:
-                // start_pedge 有可能是未知量,最好别用next_state = start_pedge ? LOAD : IDLE;
-                if (start_pedge)
-                    next_state = LOAD;
-                else
-                    next_state = IDLE;
+                next_state = start ? LOAD : IDLE;
             LOAD:
-                next_state = CE_P;
-            CE_P:
-                next_state = equal_zero ? ENDING : CE_P;
+                next_state = UPDATE;
+            UPDATE: // update 0~190，共191次，加上LOAD初始化为1，共192次
+                next_state = count == (k-2) ? ENDING : UPDATE;
             ENDING:
-                next_state = start_pedge ? LOAD : ENDING;
+                next_state = start ? ENDING : IDLE;
             default:
                 next_state = IDLE;
         endcase
@@ -131,34 +112,33 @@ module mod_mul (
         case (current_state)
             IDLE: begin
                 load = 1'b0;
-                ce_p = 1'b0;
+                update = 1'b0;
                 done = 1'b0;
             end
 
             LOAD: begin
                 load = 1'b1;
-                ce_p = 1'b0;
+                update = 1'b0;
                 done = 1'b0;
             end
 
-            CE_P: begin
+            UPDATE: begin
                 load = 1'b0;
-                ce_p = 1'b1;
+                update = 1'b1;
                 done = 1'b0;
             end
 
             ENDING: begin
                 load = 1'b0;
-                ce_p = 1'b0;
+                update = 1'b0;
                 done = 1'b1;
             end
 
             default: begin
                 load = 1'b0;
-                ce_p = 1'b0;
+                update = 1'b0;
                 done = 1'b0;
             end
-
         endcase
     end
 

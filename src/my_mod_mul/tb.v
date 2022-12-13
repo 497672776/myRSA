@@ -2,7 +2,7 @@
 module tb;
     parameter k = 12;
     parameter logk = 4;
-    parameter m = 12'd3551;
+    parameter m = 196'hfffffffffffffffffffffffffffffffefffffffffffffffff;
     reg clk, rst_n;
     reg [k-1:0] x, y;
     reg start;
@@ -90,15 +90,6 @@ module tb;
         #(CLK_PERIOD);
         start = 1;
         wait (done);
-
-        #(CLK_PERIOD);
-        start = 0;
-        x = 'd1;
-        y = 'd2292;
-        #(CLK_PERIOD);
-        start = 1;
-        wait (done);
-
 
         repeat (100)
             @(posedge clk) begin

@@ -1,9 +1,13 @@
 `timescale 1ns / 1ps
 module tb;
     reg clk, rst_n;
-    reg [191:0] x, y;
+    parameter k = 196;
+    parameter logk = 8;
+    parameter m = 196'hfffffffffffffffffffffffffffffffefffffffffffffffff;
+    parameter exp_2k = (~m+1'b1) * (~m+1'b1); //大小不能超过m,超过要对m去模
+    reg [k-1:0] x, y;
     reg start;
-    wire [191:0] z;
+    wire [k-1:0] z;
     wire done;
 
     //生成始时钟
@@ -15,16 +19,21 @@ module tb;
     end
 
     /****************** 开始 ADD module inst ******************/
-    mont_exp
-        inst_mont_exp (
-            .x                 (x),
-            .y                 (y),
-            .clk               (clk),
-            .rst_n             (rst_n),
-            .start             (start),
-            .z                 (z),
-            .done             (done)
-        );
+    mod_exp #(
+                .k   (k),
+                .logk(logk),
+                .m   (m),
+                .exp_2k (exp_2k)
+            )
+            inst_mod_exp (
+                .x                 (x),
+                .y                 (y),
+                .clk               (clk),
+                .rst_n             (rst_n),
+                .start             (start),
+                .z                 (z),
+                .done              (done)
+            );
     /****************** 结束 END module inst ******************/
 
     initial begin
@@ -41,6 +50,14 @@ module tb;
         start = 0;
         x = 8'd2;
         y = 8'd11;
+        #(NCLK);
+        start = 1;
+        wait(done);
+
+        #(NCLK);
+        start = 0;
+        x = 8'd2;
+        y = 8'd2;
         #(NCLK);
         start = 1;
         wait(done);

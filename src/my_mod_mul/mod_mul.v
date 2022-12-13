@@ -11,11 +11,13 @@ module mod_mul (
         output done
     );
 
-    parameter m = 192'hfffffffffffffffffffffffffffffffeffffffffffffffff;
-    localparam minus_m = {1'b0, ~m+1'b1};
-    parameter k = 192, logk = 8;
 
-    parameter IDLE = 3'd0, LOAD = 3'd1, UPDATE = 3'd2, ENDING = 3'd3;
+    parameter k = 192;
+    parameter logk = 8;
+    parameter m = 192'hfffffffffffffffffffffffffffffffeffffffffffffffff;
+    localparam minus_m = {1'b0, (~m+1'b1)};
+
+    localparam IDLE = 3'd0, LOAD = 3'd1, UPDATE = 3'd2, ENDING = 3'd3;
 
     reg load, update, done;
     reg [2:0] current_state, next_state;

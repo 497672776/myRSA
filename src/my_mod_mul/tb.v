@@ -1,9 +1,12 @@
 `timescale 1ns / 1ps
 module tb;
+    parameter k = 12;
+    parameter logk = 4;
+    parameter m = 12'd3551;
     reg clk, rst_n;
-    reg [191:0] x, y;
+    reg [k-1:0] x, y;
     reg start;
-    wire [191:0] z;
+    wire [k-1:0] z;
     wire done;
 
     //生成始时钟
@@ -16,7 +19,9 @@ module tb;
 
     /****************** 开始 ADD module inst ******************/
     mod_mul #(
-                .m(192'hfffffffffffffffffffffffffffffffeffffffffffffffff)
+                .k   (k),
+                .logk(logk),
+                .m   (m)
             ) inst_mod_mul (
                 .x    (x),
                 .y    (y),
@@ -44,15 +49,15 @@ module tb;
         y = 8'H0a;
         #(CLK_PERIOD);
         start = 1;
-        wait(done);
-        
+        wait (done);
+
         #(CLK_PERIOD);
         start = 0;
         x = 192'H000000000000000100000000000000020000000000000001;
         y = 8'H0B;
         #(CLK_PERIOD);
         start = 1;
-        wait(done);
+        wait (done);
 
         #(CLK_PERIOD);
         start = 0;
@@ -60,7 +65,7 @@ module tb;
         y = 192'H0x000000000000000000000000000000010000000000000001;
         #(CLK_PERIOD);
         start = 1;
-        wait(done);
+        wait (done);
 
         #(CLK_PERIOD);
         start = 0;
@@ -68,11 +73,37 @@ module tb;
         y = 192'H0x0000000000000000000000000000000B000000000000000B;
         #(CLK_PERIOD);
         start = 1;
-        wait(done);
+        wait (done);
 
-        repeat (100) @(posedge clk) begin
-        end
-        $display("运行结束！");
+        #(CLK_PERIOD);
+        start = 0;
+        x = 196'H0x0000000000000000000000000000000B0000000000000000B;
+        y = 196'H0x0000000000000000000000000000000B0000000000000000B;
+        #(CLK_PERIOD);
+        start = 1;
+        wait (done);
+
+        #(CLK_PERIOD);
+        start = 0;
+        x = 196'H0x0000000000000000000000000000007900000000000000079;
+        y = 196'd1;
+        #(CLK_PERIOD);
+        start = 1;
+        wait (done);
+
+        #(CLK_PERIOD);
+        start = 0;
+        x = 'd1;
+        y = 'd2292;
+        #(CLK_PERIOD);
+        start = 1;
+        wait (done);
+
+
+        repeat (100)
+            @(posedge clk) begin
+         end
+         $display("运行结束！");
         $dumpflush;
         $finish;
         $stop;

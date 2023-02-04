@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 module tb;
-    parameter k = 12;
-    parameter logk = 4;
-    parameter m = 196'hfffffffffffffffffffffffffffffffefffffffffffffffff;
+    parameter k = 192;
+    parameter logk = 8;
+    parameter m = 192'hfffffffffffffffffffffffffffffffeffffffffffffffff;
     reg clk, rst_n;
     reg [k-1:0] x, y;
     reg start;

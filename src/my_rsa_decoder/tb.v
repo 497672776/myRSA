@@ -50,10 +50,18 @@ module tb;
 
         #(NCLK);
         start   = 0;
-        data_in = 2959;
+        data_in = 12'd2959;
         #(NCLK);
         start = 1;
         wait (done);
+
+        #(NCLK);
+        start   = 0;
+        data_in = 12'd59;
+        #(NCLK);
+        start = 1;
+        wait (done);
+
 
         repeat (1000) begin
             @(posedge clk);
